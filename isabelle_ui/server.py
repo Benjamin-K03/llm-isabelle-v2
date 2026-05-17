@@ -112,7 +112,7 @@ class ProveReq(BaseModel):
     minimize: bool = True
 
 class ProveResp(BaseModel):
-    success: bool
+    success: bool   
     depth: int
     timeout: bool
     model: str
