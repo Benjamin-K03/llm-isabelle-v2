@@ -2,3 +2,5 @@ venv
 .vscode
 __pycache__/
 *.pyc
+logs/attempts.log.jsonl
+logs/runs.log.jsonl
