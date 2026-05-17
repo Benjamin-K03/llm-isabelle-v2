@@ -1,4 +1,5 @@
-isabelle-client
+isabelle-client==0.5.7
+sentence-transformers
 scikit-learn
 xgboost
 joblib
