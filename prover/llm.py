@@ -74,7 +74,9 @@ def _ollama_generate(system_prompt: str, user_prompt: str, model: str, *,
         _log(f"call: ollama url={url} model={model}")
         resp = _SESSION.post(url, json=payload, timeout=int(TIMEOUT_S))
         resp.raise_for_status()
-        return resp.json().get("response", "")
+        raw = resp.json().get("response", "")
+        _log(f"response: {raw!r}")
+        return raw
     except Exception as e:
         err = f"__ERROR__ {e}"
         _log(f"error: ollama model={model}: {e}")
@@ -113,7 +115,9 @@ def _gemini_cli_generate(system_prompt: str, user_prompt: str, model: str) -> st
             msg = (proc.stderr or proc.stdout).decode("utf-8", "ignore").strip()
             _log(f"error: gemini-cli rc={proc.returncode} {msg}")
             return f"__ERROR__ gemini CLI failed ({proc.returncode}): {msg}"
-        return proc.stdout.decode("utf-8", "ignore")
+        raw = proc.stdout.decode("utf-8", "ignore")
+        _log(f"response: {raw!r}")
+        return raw
     except Exception as e:
         _log(f"error: gemini-cli: {e}")
         return f"__ERROR__ {e}"
@@ -153,10 +157,13 @@ def _hf_inference_api_generate(system_prompt: str, user_prompt: str, repo_id: st
         resp.raise_for_status()
         data = resp.json()
         if isinstance(data, list) and data and isinstance(data[0], dict) and "generated_text" in data[0]:
-            return data[0]["generated_text"]
-        if isinstance(data, dict) and "generated_text" in data:
-            return data["generated_text"]
-        return json.dumps(data, ensure_ascii=False)
+            raw = data[0]["generated_text"]
+        elif isinstance(data, dict) and "generated_text" in data:
+            raw = data["generated_text"]
+        else:
+            raw = json.dumps(data, ensure_ascii=False)
+        _log(f"response: {raw!r}")
+        return raw
     except Exception as e:
         _log(f"error: hf-inference-api repo={repo_id}: {e}")
         return f"__ERROR__ {e}"
@@ -189,8 +196,11 @@ def _hf_local_generate(system_prompt: str, user_prompt: str, repo_id: str,
             top_p=float(TOP_P),
         )
         if isinstance(out, list) and out:
-            return str(out[0].get("generated_text", ""))
-        return str(out)
+            raw = str(out[0].get("generated_text", ""))
+        else:
+            raw = str(out)
+        _log(f"response: {raw!r}")
+        return raw
     except Exception as e:
         _log(f"error: hf-local repo={repo_id}: {e}")
         return f"__ERROR__ {e}"
