@@ -32,6 +32,8 @@ _INLINE_BY_TAIL = re.compile(r"\s+by\s+.+$")
 _BARE_DOT = re.compile(r"(?m)^\s*\.\s*$")
 _HEAD_CMD_RE = re.compile(r"^\s*(have|show|obtain)\b")  # local copy to avoid new imports
 _ISA_VERIFY_TIMEOUT_S = int(os.getenv("ISABELLE_VERIFY_TIMEOUT_S", "30"))
+# debug level logging
+_VERBOSE = os.getenv("LLM_DEBUG", "").strip().lower() not in ("", "0", "false", "no")
 
 @dataclass(slots=True)
 class PlanAndFillResult:
@@ -40,6 +42,10 @@ class PlanAndFillResult:
     fills: List[str]
     failed_holes: List[int]
 
+# debug level logging
+def _log(msg: str) -> None:
+    if _VERBOSE:
+        print(f"[llm] {msg}", flush=True)
 
 # ============================================================================
 # Hole Filling
@@ -726,6 +732,10 @@ def plan_and_fill(goal: str, model: Optional[str] = None, timeout: int = 100, *,
 
         # Final verification
         success = ("sorry" not in full)
+
+        # log final proof
+        _log(msg=full)
+
         if success:
             try:
                 if _verify_full_proof(isa, session, full):
