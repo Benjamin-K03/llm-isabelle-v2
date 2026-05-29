@@ -156,6 +156,16 @@ def _extract_variable_info(state_block: str) -> Tuple[List[str], List[str], List
 
 # === Building the effective goal ==============================================
 
+def _parse_goal_from_state(state_block: str) -> Optional[str]:
+    if not state_block:
+        return None
+    goal_match = re.search(r'goal\s*\([^)]+\):\s*\d+\.\s*(.+?)(?:\n\s*\d+\.|$)', state_block, re.DOTALL)
+    if goal_match:
+        goal = goal_match.group(1).strip()
+        goal = re.sub(r'\s+', ' ', goal)
+        return goal
+    return None
+
 def _effective_goal_from_state(
     state_block: str,
     fallback_goal: str,
@@ -181,6 +191,15 @@ def _effective_goal_from_state(
     # Extract alpha-renamed subgoal (multi-line safe)
     renamed_subgoal = _extract_subgoal_from_markers(clean) or ""
     if not renamed_subgoal:
+        parsed = _parse_goal_from_state(clean)
+        if parsed:
+            q = re.compile(r'^(?:\\<And>|⋀)\s*[^.]*\.\s*')
+            while True:
+                m = q.match(parsed)
+                if not m:
+                    break
+                parsed = parsed[m.end():]
+            return f"({parsed})"
         return fallback_goal
 
     params, frees, schems, skolems = _extract_variable_info(state_block)
@@ -189,12 +208,6 @@ def _effective_goal_from_state(
     clean_subgoal = renamed_subgoal
     for tok in sorted(set(re.findall(r"\b([A-Za-z0-9_]+__)\b", renamed_subgoal))):
         clean_subgoal = re.sub(r"\b" + re.escape(tok) + r"\b", tok.rstrip('_'), clean_subgoal)
-
-    # if trace:
-    #     print("\n" + "=" * 60)
-    #     print(f"DEBUG params={params}, frees={frees}, schems={schems}, skolems={skolems}")
-    #     print(f"DEBUG renamed_subgoal= {renamed_subgoal}")
-    #     print(f"DEBUG clean_subgoal= {clean_subgoal}")
 
     # Build the goal with meta-level quantification for params and skolems
     core = clean_subgoal
@@ -260,7 +273,7 @@ method_setup llm_print_vars = ‹
 
 
 def _inject_var_extraction(proof_lines: List[str]) -> List[str]:
-    return [*proof_lines, "  apply llm_print_vars"]
+    return [*proof_lines, "  print_state", "  apply llm_print_vars"]
 
 
 def _extract_print_state_from_responses(resps: List) -> str:
@@ -313,6 +326,8 @@ def _extract_print_state_from_responses(resps: List) -> str:
                         'Bad context for command "end"' in text
                         or text.strip().startswith('Undefined fact: "assms"')
                         or text.strip().startswith('Undefined fact: "set_empty_conv"')
+                        or 'Illegal application of proof command in "state" mode' in text
+                        or 'Illegal application of proof command in "chain" mode' in text
                     )
                     if not benign:
                         print(f"[DEBUG ERROR]: {text[:300]}")
