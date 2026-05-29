@@ -45,7 +45,7 @@ class PlanAndFillResult:
 # debug level logging
 def _log(msg: str) -> None:
     if _VERBOSE:
-        print(f"[llm] {msg}", flush=True)
+        print(f"[proof state] \n{msg}\n[proof state]", flush=True)
 
 # ============================================================================
 # Hole Filling
