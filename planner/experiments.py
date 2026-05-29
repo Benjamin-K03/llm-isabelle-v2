@@ -90,6 +90,8 @@ def _planner_atexit_drain():
     # Drain/close any still-open default loop at process exit
     _drain_and_close_loop(loop)
 
+import prover.isabelle_api as _isa_api
+
 # ---------- Common paths ----------
 BENCH_DIR = Path("datasets")
 RESULTS_DIR = BENCH_DIR / "planner_results"
@@ -110,6 +112,26 @@ SUITE_MAP = {
 
 # Precompile once for small speedup on large files
 _LEMMA_RE = re.compile(r'lemma\s+"(.+)"', re.IGNORECASE)
+
+def _apply_base_thy_imports(base_thy: Optional[str]) -> None:
+    """Parse imports from a .thy file and inject them into isabelle_api.EXTRA_IMPORTS."""
+    if not base_thy:
+        return
+    p = Path(base_thy)
+    if not p.exists():
+        print(f"[experiments] warning: --base-thy file not found: {p}")
+        return
+    text = p.read_text(encoding="utf-8")
+    # Extract everything between 'imports' and 'begin'
+    m = re.search(r'\bimports\b(.*?)\bbegin\b', text, re.DOTALL)
+    if not m:
+        return
+    imports = re.findall(r'"[^"]+"|[\w\-./]+', m.group(1))
+    imports = [i.strip('"') for i in imports if i.strip('"')]
+    if imports:
+        _isa_api.EXTRA_IMPORTS = imports
+        print(f"[experiments] base-thy imports: {' '.join(imports)}")
+
 
 # ---------- Shared goal IO ----------
 def _read_goals_file(path: Path) -> List[str]:
@@ -559,6 +581,7 @@ def _bench_write_csv(suite_name: str, cfg_name: str, rows: List[BenchRow]) -> Pa
     return out
 
 def cmd_bench(args: argparse.Namespace) -> None:
+    _apply_base_thy_imports(getattr(args, "base_thy", None))
     # Resolve suites
     if args.file:
         suites: List[Tuple[str, Path]] = [(Path(args.file).stem, Path(args.file))]
@@ -788,6 +811,7 @@ def _reg_compare(current: Report, baseline_data: Dict[str, Any], *, tol_rate: fl
     return regressed
 
 def cmd_regress(args: argparse.Namespace) -> None:
+    _apply_base_thy_imports(getattr(args, "base_thy", None))
     # Resolve suite path
     if args.file:
         suite_name = Path(args.file).stem
@@ -1166,7 +1190,9 @@ def main():
                      help="Disable file-aware context window.")
     pb.set_defaults(context=True)
     pb.add_argument("--context-files", type=str, default="",
-                     help="Space/comma-separated .thy files to seed context.")    
+                     help="Space/comma-separated .thy files to seed context.")
+    pb.add_argument("--base-thy", type=str, default=None,
+                     help="Path to a .thy file whose imports are added to every Scratch theory (e.g. datasets/mini_f2f/MiniF2F_Base.thy).")
     pb.set_defaults(func=cmd_bench)
 
     # Regress
@@ -1217,7 +1243,9 @@ def main():
                      help="Disable file-aware context window.")
     pr.set_defaults(context=True)
     pr.add_argument("--context-files", type=str, default="",
-                     help="Space/comma-separated .thy files to seed context.")      
+                     help="Space/comma-separated .thy files to seed context.")
+    pr.add_argument("--base-thy", type=str, default=None,
+                     help="Path to a .thy file whose imports are added to every Scratch theory.")
     pr.set_defaults(func=cmd_regress)
 
     # Aggregate
