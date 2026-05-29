@@ -35,6 +35,9 @@ _last_call_timed_out = False
 
 def _header(imports: Optional[List[str]] = None) -> str:
     imps = ["Main"] + list(imports or []) + list(EXTRA_IMPORTS or [])
+    session = os.environ.get("ISABELLE_LOGIC") or os.environ.get("ISABELLE_SESSION") or "HOL"
+    if session not in ("HOL", "Main", "Complex_Main") and session not in imps:
+        imps.append(session)
     return f"theory Scratch\nimports {' '.join(imps)}\nbegin\n"
 
 

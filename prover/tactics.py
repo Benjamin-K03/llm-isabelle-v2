@@ -257,17 +257,26 @@ def sledgehammer_finishers(isabelle, session_id: str, steps: List[str], timeout_
 FIND_NAME_TOKENS = re.compile(r"[A-Za-z][A-Za-z0-9_']{2,}")
 _LEMMA_LINE = re.compile(r"^\s*\d+\.\s*([A-Za-z0-9_\.]+):")
 
+def _get_tactics_imports():
+    import os
+    session = os.environ.get("ISABELLE_LOGIC") or os.environ.get("ISABELLE_SESSION") or "HOL"
+    if session not in ("HOL", "Main", "Complex_Main"):
+        return f"Main {session}"
+    return "Main"
+
 def _build_find_theorems_theory(symbols: List[str]) -> str:
     body = "\n".join(f'find_theorems name:{s}' for s in symbols[:8])
-    return textwrap.dedent(f"theory FT_Scratch\nimports Main\nbegin\n\n{body}\n\nend").strip()
+    imps = _get_tactics_imports()
+    return textwrap.dedent(f"theory FT_Scratch\nimports {imps}\nbegin\n\n{body}\n\nend").strip()
 
 def _build_find_theorems_filtered(symbols: List[str], filters: List[str]) -> str:
     lines = []
     for s in symbols[:8]:
         for flt in filters:
             lines.append(f"find_theorems {flt} name:{s}" if flt else f"find_theorems name:{s}")
+    imps = _get_tactics_imports()
     return textwrap.dedent(
-        "theory FT2_Scratch\nimports Main\nbegin\n\n{}\n\nend".format("\n".join(lines))
+        f"theory FT2_Scratch\nimports {imps}\nbegin\n\n{{}}\n\nend".format("\n".join(lines))
     ).strip()
 
 def mine_lemmas_from_state(isabelle, session_id: str, state_hint: str, max_lemmas: int = 6) -> List[str]:
