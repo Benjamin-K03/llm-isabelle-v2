@@ -424,11 +424,9 @@ def _sanitize_outline(text: str, goal: str, *, force_outline: bool) -> str:
         if first_lemma >= 0:
             text = text[first_lemma:]
 
-    # Ensure proof/qed skeleton exists
-    if not PROOF_RE.search(text):
-        text = text.rstrip() + "\nproof\n  sorry\nqed\n"
-    if not QED_RE.search(text):
-        text = text.rstrip() + "\nqed\n"
+    # If the LLM produced a completely bare lemma with no proof block, just append sorry.
+    if not PROOF_RE.search(text) and not _HAS_TACTIC_NEXT.search(text):
+        text = text.rstrip() + "\n  sorry\n"
 
     # Force an outline (remove inline 'by' if requested by caller)
     if force_outline:
@@ -442,6 +440,8 @@ def _sanitize_outline(text: str, goal: str, *, force_outline: bool) -> str:
             if m_qed:
                 insert_at = m_qed.start()
                 text = text[:insert_at] + "  sorry\n" + text[insert_at:]
+            else:
+                text = text.rstrip() + "\n  sorry\n"
 
     # Light Isar fixups (order matters)
     #  1) Flip only the meta after 'show', preserving 'then/using/from/with/finally' etc.
@@ -469,7 +469,7 @@ def _quick_sketch_score(isabelle, session_id: str, outline_text: str) -> int:
         return 9999
 
 def _state_block_for_goal(isabelle, session_id: str, goal: str) -> str:
-    mini = f'lemma "{goal}"\nproof\n  sorry\nqed\n'
+    mini = f'lemma "{goal}"\n  sorry\n'
     try:
         thy = build_theory(mini.splitlines(), add_print_state=True, end_with="sorry")
         resps = run_theory(isabelle, session_id, thy)
