@@ -123,9 +123,19 @@ def _fill_one_hole(isabelle, session: str, full_text: str, hole_span: Tuple[int,
         insert = "\n  " + "\n  ".join(script_lines) + "\n"
         s, e = hole_span
         new_text = full_text[:s] + insert + full_text[e:]
-        
+
         if _verify_full_proof(isabelle, session, new_text):
             return new_text, True, "\n".join(script_lines)
+
+        # Fallback: bare 'by X' is not a valid command inside proof...qed structured
+        # blocks — it must be wrapped as 'show ?thesis/case by X'. Try both.
+        for meta in ("?thesis", "?case"):
+            show_lines = applies + [f"show {meta}", f"  {fin}"]
+            show_insert = "\n  " + "\n  ".join(show_lines) + "\n"
+            new_text_show = full_text[:s] + show_insert + full_text[e:]
+            if _verify_full_proof(isabelle, session, new_text_show):
+                return new_text_show, True, "\n".join(show_lines)
+
         return full_text, False, "finisher-unverified"
     
     # Handle apply-only  (NEVER mark success for apply-only scripts)

@@ -400,14 +400,14 @@ def _ensure_have_show_bodies(text: str) -> str:
     return "\n".join(out)
 
 def _maybe_proof_dash(text: str) -> str:
-    """
-    If there is a bare 'proof' at top-level and calculational cues present, prefer 'proof -'.
+    """Convert bare 'proof' to 'proof -' (identity method, always safe).
+
+    Bare 'proof' tries to apply a default intro rule which fails on many goals
+    with 'Failed to apply initial proof method'. 'proof -' never fails.
     """
     if not BARE_PROOF_RE.search(text):
         return text
-    if re.search(r"(?m)^\s*(have|also|moreover|ultimately|finally|hence|thus)\b", text):
-        return BARE_PROOF_RE.sub("proof -", text, count=1)
-    return text
+    return BARE_PROOF_RE.sub("proof -", text, count=1)
 
 def _sanitize_outline(text: str, goal: str, *, force_outline: bool) -> str:
     text = _ensure_lemma_header(text, goal)
@@ -459,14 +459,40 @@ def _sanitize_outline(text: str, goal: str, *, force_outline: bool) -> str:
     return text
 
 def _quick_sketch_score(isabelle, session_id: str, outline_text: str) -> int:
-    try:
-        thy = build_theory(outline_text.splitlines(), add_print_state=True, end_with="sorry")
-        resps = run_theory(isabelle, session_id, thy)
-        block = last_print_state_block(resps) or ""
-        n = parse_subgoals(block)
-        return int(n) if isinstance(n, int) else 9999
-    except Exception:
-        return 9999
+    """Score an outline candidate. Lower is better.
+
+    Running sorry-containing outlines through Isabelle always returns 0 remaining
+    subgoals (sorry closes everything), so we can't use that as a signal.
+    Instead we score by:
+      - 0      : no sorrys at all (try to verify; a complete proof wins immediately)
+      - sorry_count : structured outline (has have/case decomposition)
+      - 9000   : trivial outline (sorry with no decomposition — pure deferral)
+    """
+    sorry_count = len(re.findall(r'\bsorry\b', outline_text))
+
+    if sorry_count == 0:
+        # Potentially complete — verify with Isabelle; 0 remaining subgoals = best
+        try:
+            thy = build_theory(outline_text.splitlines(), add_print_state=True, end_with=None)
+            resps = run_theory(isabelle, session_id, thy)
+            block = last_print_state_block(resps) or ""
+            n = parse_subgoals(block)
+            return int(n) if isinstance(n, int) else 0
+        except Exception:
+            return 0
+
+    # Measure structural decomposition: have/case lines indicate the outline
+    # broke the goal into sub-problems rather than just deferring everything.
+    have_count = len(re.findall(r'(?m)^\s*have\b', outline_text))
+    case_count = len(re.findall(r'(?m)^\s*case\b', outline_text))
+    structure = have_count + case_count
+
+    if structure == 0:
+        # e.g. "proof sorry qed" or "by sorry" — no decomposition at all
+        return 9000
+
+    # Structured outline: prefer fewer sorry holes
+    return sorry_count
 
 def _state_block_for_goal(isabelle, session_id: str, goal: str) -> str:
     mini = f'lemma "{goal}"\nproof\n  sorry\nqed\n'
@@ -684,19 +710,6 @@ proof (cases b)
 next
   case False
   show ?thesis
-    sorry
-qed
-''')
-    lib.append(
-f'''lemma "{goal}"
-proof -
-  have f1: "(* fill a useful intermediate statement *)"
-    sorry
-  have f2: "(* another useful intermediate *)"
-    using f1
-    sorry
-  show ?thesis
-    using f1 f2
     sorry
 qed
 ''')

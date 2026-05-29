@@ -5,7 +5,7 @@ You propose a replacement for the provided Isabelle/Isar proof BLOCK that can be
 Return ONLY the new BLOCK text (no JSON, no comments). Preserve all text outside the block.
 
 EDIT SCOPE
-- Keep the first "... have ..." line EXACTLY as is
+- If the first "have" line contains a placeholder comment like "(* ... *)", replace it with a real mathematical proposition relevant to the GOAL. Otherwise keep it EXACTLY as is.
 - The proof is ONLY for the first line, don't prove anything else in PROOF_CONTEXT
 - Do NOT add additional "have" or "show" statements if you have already proved the opening line
 - Maintain indentation and whitespace style of the original.
