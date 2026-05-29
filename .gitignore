@@ -4,3 +4,6 @@ __pycache__/
 *.pyc
 logs/attempts.log.jsonl
 logs/runs.log.jsonl
+.python-version
+datasets/planner_results
+logs/
