@@ -153,7 +153,7 @@ def _print_state_before_hole(isabelle, session: str, full_text: str, hole_span: 
             hole_line = nearest
             indent = len(lines[hole_line]) - len(lines[hole_line].lstrip(" "))
     pad = " " * max(2, indent)
-    injected = [f"{pad}prefer 1", f"{pad}print_state", f"{pad}(* REPAIR-PRINT-STATE *)"]
+    injected = [f"{pad}print_state", f"{pad}(* REPAIR-PRINT-STATE *)"]
     variant_lines = lines[:hole_line] + injected + lines[hole_line:]
     variant = "\n".join(variant_lines) + ("\n" if full_text.endswith("\n") else "")
     try:
