@@ -583,7 +583,7 @@ def _replace_failing_tactics_with_sorry(block_text: str, *, full_text_lines: Lis
             if head_idx is not None:
                 head_indent = block_lines[head_idx][:len(block_lines[head_idx]) - len(block_lines[head_idx].lstrip())]
                 seq_s, seq_e = _apply_sequence_bounds(block_lines, cand)
-                block_lines[seq_s:seq_e] = [f"{head_indent}proof -", f"{head_indent}  sorry", f"{head_indent}qed"]
+                block_lines[seq_s:seq_e] = [f"{head_indent}  sorry"]
             else:
                 break
         else:
